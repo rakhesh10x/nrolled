@@ -83,23 +83,35 @@ export default function Chat() {
             )}
             
             <div className={styles.message}>
-              {(m.content || "").split('\n').map((line, i) => (
-                <p key={i}>{line}</p>
-              ))}
-              
-              {m.toolInvocations?.map(toolInvocation => (
-                <div key={toolInvocation.toolCallId} className={styles.toolCall}>
-                  {toolInvocation.toolName === "searchPolicies" && <FileText size={14} />}
-                  {toolInvocation.toolName === "getLeaveBalance" && <User size={14} />}
-                  {toolInvocation.toolName === "createJobPosting" && <Briefcase size={14} />}
-                  <span>
-                    {toolInvocation.state === "result" ? "✓" : "..."} 
-                    {" "}{toolInvocation.toolName === "searchPolicies" ? "Searching HR policies..." : 
-                          toolInvocation.toolName === "getLeaveBalance" ? "Checking database..." : 
-                          "Processing job requisition..."}
-                  </span>
-                </div>
-              ))}
+              {m.parts ? (
+                m.parts.map((part, index) => {
+                  if (part.type === 'text') {
+                    return (part.text || "").split('\n').map((line, i) => (
+                      <p key={`${index}-${i}`}>{line}</p>
+                    ));
+                  }
+                  if (part.type === 'tool-call' || part.type === 'tool-result' || part.type === 'tool-invocation') {
+                    return (
+                      <div key={part.toolCallId || index} className={styles.toolCall}>
+                        {part.toolName === "searchPolicies" && <FileText size={14} />}
+                        {part.toolName === "getLeaveBalance" && <User size={14} />}
+                        {part.toolName === "createJobPosting" && <Briefcase size={14} />}
+                        <span>
+                          {part.type === 'tool-result' ? "✓" : "..."} 
+                          {" "}{part.toolName === "searchPolicies" ? "Searching HR policies..." : 
+                                part.toolName === "getLeaveBalance" ? "Checking database..." : 
+                                "Processing job requisition..."}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })
+              ) : (
+                (m.content || "").split('\n').map((line, i) => (
+                  <p key={i}>{line}</p>
+                ))
+              )}
             </div>
 
             {m.role === "user" && (

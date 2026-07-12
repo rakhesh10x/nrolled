@@ -82,7 +82,7 @@ export default function Chat() {
             )}
             
             <div className={styles.message}>
-              {m.content.split('\n').map((line, i) => (
+              {(m.content || "").split('\n').map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
               

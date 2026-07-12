@@ -75,5 +75,5 @@ export async function POST(req) {
     },
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }

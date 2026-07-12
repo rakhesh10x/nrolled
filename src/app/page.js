@@ -10,6 +10,7 @@ export default function Chat() {
   const [debugMsg, setDebugMsg] = useState("");
   const chatState = useChat({
     api: "/api/chat",
+    streamProtocol: "ui-message",
     onError: (err) => setDebugMsg(err.message)
   });
   

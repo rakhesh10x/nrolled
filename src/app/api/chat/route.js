@@ -7,6 +7,7 @@ import path from 'path';
 const customOpenAI = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   baseURL: 'https://api.oxlo.ai/v1',
+  compatibility: 'compatible'
 });
 
 // Allow streaming responses up to 30 seconds
@@ -16,7 +17,7 @@ export async function POST(req) {
   const { messages } = await req.json();
 
   const result = streamText({
-    model: customOpenAI('gpt-4o-mini'),
+    model: customOpenAI('deepseek-v3.2'),
     system: `You are a helpful, professional AI HR Assistant for Nrolled. 
     You answer questions regarding HR policies, leave balances, and job creation. 
     Always use the provided tools to fetch accurate information rather than guessing.

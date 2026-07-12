@@ -6,11 +6,16 @@ import styles from "./page.module.css";
 import { useEffect, useRef, useState } from "react";
 
 export default function Chat() {
+  const [input, setInput] = useState("");
   const [debugMsg, setDebugMsg] = useState("");
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+  const chatState = useChat({
     api: "/api/chat",
     onError: (err) => setDebugMsg(err.message)
   });
+  
+  const messages = chatState.messages || [];
+  const isLoading = chatState.status === "submitted" || chatState.status === "streaming" || chatState.isLoading;
+  const error = chatState.error;
   
   const messagesEndRef = useRef(null);
 
@@ -24,9 +29,19 @@ export default function Chat() {
 
   const onSubmit = (e) => {
     e.preventDefault();
+    if (!input.trim()) return;
     setDebugMsg("Sending...");
     try {
-      handleSubmit(e);
+      if (chatState.append) {
+        chatState.append({ role: 'user', content: input });
+      } else if (chatState.sendMessage) {
+        chatState.sendMessage({ role: 'user', content: input });
+      } else if (chatState.handleSubmit) {
+        chatState.handleSubmit(e);
+      } else {
+        throw new Error("Could not find a valid send method in useChat exports: " + Object.keys(chatState).join(", "));
+      }
+      setInput("");
       setDebugMsg("Sent!");
     } catch(err) {
       setDebugMsg("Client Error: " + err.message);
@@ -125,7 +140,7 @@ export default function Chat() {
             className={styles.input}
             value={input}
             placeholder="Type your HR question here..."
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             disabled={isLoading}
           />
           <button type="submit" className={styles.button}>

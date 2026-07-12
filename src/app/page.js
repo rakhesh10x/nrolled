@@ -3,11 +3,13 @@
 import { useChat } from "@ai-sdk/react";
 import { Send, Sparkles, Bot, User, Briefcase, FileText } from "lucide-react";
 import styles from "./page.module.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const [debugMsg, setDebugMsg] = useState("");
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
+    onError: (err) => setDebugMsg(err.message)
   });
   
   const messagesEndRef = useRef(null);
@@ -19,6 +21,17 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    setDebugMsg("Sending...");
+    try {
+      handleSubmit(e);
+      setDebugMsg("Sent!");
+    } catch(err) {
+      setDebugMsg("Client Error: " + err.message);
+    }
+  };
 
   return (
     <main className={styles.main}>
@@ -95,11 +108,19 @@ export default function Chat() {
             </div>
           </div>
         )}
+        
+        {(error || debugMsg) && (
+          <div style={{ color: 'red', textAlign: 'center', marginTop: '20px' }}>
+            <p>Debug Status: {debugMsg}</p>
+            {error && <p>Error: {error.message || "Failed to fetch response."}</p>}
+          </div>
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
 
       <div className={styles.inputContainer}>
-        <form onSubmit={handleSubmit} className={styles.form}>
+        <form onSubmit={onSubmit} className={styles.form}>
           <input
             className={styles.input}
             value={input}
@@ -107,7 +128,7 @@ export default function Chat() {
             onChange={handleInputChange}
             disabled={isLoading}
           />
-          <button type="submit" className={styles.button} disabled={isLoading || !input?.trim()}>
+          <button type="submit" className={styles.button}>
             <Send size={20} />
           </button>
         </form>

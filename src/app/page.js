@@ -107,7 +107,7 @@ export default function Chat() {
             onChange={handleInputChange}
             disabled={isLoading}
           />
-          <button type="submit" className={styles.button} disabled={isLoading || !input.trim()}>
+          <button type="submit" className={styles.button} disabled={isLoading || !input?.trim()}>
             <Send size={20} />
           </button>
         </form>

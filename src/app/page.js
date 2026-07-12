@@ -1,6 +1,6 @@
 "use client";
 
-import { useChat } from "ai/react";
+import { useChat } from "@ai-sdk/react";
 import { Send, Sparkles, Bot, User, Briefcase, FileText } from "lucide-react";
 import styles from "./page.module.css";
 import { useEffect, useRef } from "react";

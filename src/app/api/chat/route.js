@@ -16,23 +16,29 @@ export const maxDuration = 30;
 export async function POST(req) {
   const { messages } = await req.json();
 
-  const sanitizedMessages = messages.map(m => {
-    // Some client SDK versions send assistant messages without a content field if they only have tool calls.
-    // The server SDK strictly requires the content field to be a string.
-    if (m.content === undefined || m.content === null) {
-      return { ...m, content: "" };
+  const coreMessages = messages.map(m => {
+    if (m.parts) {
+      const content = m.parts
+        .filter(part => ['text', 'tool-call', 'tool-result'].includes(part.type))
+        .map(part => {
+          if (part.type === 'text') return { type: 'text', text: part.text || "" };
+          if (part.type === 'tool-call') return { type: 'tool-call', toolName: part.toolName, toolCallId: part.toolCallId, args: part.args || {} };
+          if (part.type === 'tool-result') return { type: 'tool-result', toolName: part.toolName, toolCallId: part.toolCallId, result: part.result || "completed" };
+          return part;
+        });
+      return { role: m.role, content: content.length > 0 ? content : m.content || "" };
     }
-    return m;
+    return { role: m.role, content: m.content || "" };
   });
 
   const result = streamText({
-    model: customOpenAI('deepseek-v3.2'),
+    model: customOpenAI('mistral-7b'),
     system: `You are a helpful, professional AI HR Assistant for Nrolled. 
     You answer questions regarding HR policies, leave balances, and job creation. 
     Always use the provided tools to fetch accurate information rather than guessing.
     If you don't know the answer, politely say so.
     Be concise but friendly.`,
-    messages: sanitizedMessages,
+    messages: coreMessages,
     tools: {
       searchPolicies: tool({
         description: 'Search the Nrolled HR employee handbook and policies document for answers about leave process, payroll, and workforce management.',

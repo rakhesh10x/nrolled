@@ -16,6 +16,15 @@ export const maxDuration = 30;
 export async function POST(req) {
   const { messages } = await req.json();
 
+  const sanitizedMessages = messages.map(m => {
+    // Some client SDK versions send assistant messages without a content field if they only have tool calls.
+    // The server SDK strictly requires the content field to be a string.
+    if (m.content === undefined || m.content === null) {
+      return { ...m, content: "" };
+    }
+    return m;
+  });
+
   const result = streamText({
     model: customOpenAI('deepseek-v3.2'),
     system: `You are a helpful, professional AI HR Assistant for Nrolled. 
@@ -23,7 +32,7 @@ export async function POST(req) {
     Always use the provided tools to fetch accurate information rather than guessing.
     If you don't know the answer, politely say so.
     Be concise but friendly.`,
-    messages,
+    messages: sanitizedMessages,
     tools: {
       searchPolicies: tool({
         description: 'Search the Nrolled HR employee handbook and policies document for answers about leave process, payroll, and workforce management.',

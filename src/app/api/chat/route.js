@@ -4,6 +4,17 @@ import path from 'path';
 const OXLO_API_KEY = process.env.OPENAI_API_KEY;
 const OXLO_BASE_URL = 'https://api.oxlo.ai/v1';
 
+// Multiple API keys: comma-separated in OXLO_API_KEYS env var, falls back to single key
+const API_KEYS = (process.env.OXLO_API_KEYS || OXLO_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
+let currentKeyIndex = 0;
+
+function getNextKey() {
+  if (API_KEYS.length === 0) throw new Error('No API keys configured');
+  const key = API_KEYS[currentKeyIndex];
+  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+  return key;
+}
+
 export const maxDuration = 30;
 
 // Tool definitions in OpenAI format
@@ -87,27 +98,44 @@ function executeTool(name, args) {
   }
 }
 
-// Call the Oxlo API directly
+// Call the Oxlo API with automatic key rotation on rate limits
 async function callOxlo(messages, tools) {
-  const res = await fetch(`${OXLO_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OXLO_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'mistral-7b',
-      messages,
-      ...(tools ? { tools, tool_choice: 'auto' } : {})
-    })
-  });
+  let lastError;
 
-  if (!res.ok) {
+  for (let attempt = 0; attempt < API_KEYS.length; attempt++) {
+    const apiKey = getNextKey();
+
+    const res = await fetch(`${OXLO_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'mistral-7b',
+        messages,
+        ...(tools ? { tools, tool_choice: 'auto' } : {})
+      })
+    });
+
+    if (res.ok) {
+      return res.json();
+    }
+
     const errText = await res.text();
+
+    // Rate limit or payment error — try next key
+    if (res.status === 429 || res.status === 402 || res.status === 403) {
+      console.warn(`API key ending ...${apiKey.slice(-6)} hit limit (${res.status}), rotating to next key`);
+      lastError = new Error(`Key ...${apiKey.slice(-6)} rate limited (${res.status})`);
+      continue;
+    }
+
+    // Any other error — don't retry
     throw new Error(`Oxlo API error ${res.status}: ${errText}`);
   }
 
-  return res.json();
+  throw lastError || new Error('All API keys exhausted');
 }
 
 export async function POST(req) {

@@ -113,9 +113,10 @@ export async function POST(req) {
       });
 
       if (result.text) {
-        push(`data: {"type":"text-start","id":"msg_${Date.now()}"}\n\n`);
-        push(`data: {"type":"text-delta","textDelta":${JSON.stringify(result.text)}}\n\n`);
-        push(`data: {"type":"text-end"}\n\n`);
+        const msgId = "msg_" + Date.now();
+        push(`data: {"type":"text-start","id":"${msgId}"}\n\n`);
+        push(`data: {"type":"text-delta","id":"${msgId}","delta":${JSON.stringify(result.text)}}\n\n`);
+        push(`data: {"type":"text-end","id":"${msgId}"}\n\n`);
       }
 
       push(`data: {"type":"finish-step"}\n\n`);

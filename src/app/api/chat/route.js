@@ -1,4 +1,4 @@
-import { streamText, tool } from 'ai';
+import { generateText, tool } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import fs from 'fs';
@@ -10,7 +10,6 @@ const customOpenAI = createOpenAI({
   compatibility: 'compatible'
 });
 
-// Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
 export async function POST(req) {
@@ -31,7 +30,7 @@ export async function POST(req) {
     return { role: m.role, content: m.content || "" };
   });
 
-  const result = streamText({
+  const result = await generateText({
     model: customOpenAI('mistral-7b'),
     system: `You are a helpful, professional AI HR Assistant for Nrolled. 
     You answer questions regarding HR policies, leave balances, and job creation. 
@@ -39,6 +38,7 @@ export async function POST(req) {
     If you don't know the answer, politely say so.
     Be concise but friendly.`,
     messages: coreMessages,
+    maxSteps: 3,
     tools: {
       searchPolicies: tool({
         description: 'Search the Nrolled HR employee handbook and policies document for answers about leave process, payroll, and workforce management.',
@@ -46,8 +46,6 @@ export async function POST(req) {
           query: z.string().describe('The topic to search for in the handbook'),
         }),
         execute: async ({ query }) => {
-          // Dummy RAG implementation: Just read the markdown file and return it
-          // In a real scenario, this would create embeddings and do a vector search
           const filePath = path.join(process.cwd(), 'src', 'data', 'hr_policies.md');
           try {
             const fileContent = fs.readFileSync(filePath, 'utf-8');
@@ -63,7 +61,6 @@ export async function POST(req) {
           employeeId: z.string().describe('The ID of the employee (e.g., 101, 102). Ask the user for their ID if not provided.'),
         }),
         execute: async ({ employeeId }) => {
-          // Dummy API integration
           const balances = {
             "101": 12,
             "102": 5,
@@ -84,7 +81,6 @@ export async function POST(req) {
           salaryRange: z.string(),
         }),
         execute: async (params) => {
-          // Dummy API integration
           return {
             status: "success",
             message: "Role Requisition submitted for Finance approval.",
@@ -96,5 +92,41 @@ export async function POST(req) {
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      const push = (str) => controller.enqueue(encoder.encode(str));
+      
+      push(`data: {"type":"start"}\n\n`);
+      push(`data: {"type":"start-step"}\n\n`);
+      
+      const step = result.steps?.[result.steps.length - 1] || result;
+      const toolCalls = step.toolCalls || [];
+      const toolResults = step.toolResults || [];
+      
+      toolCalls.forEach(tc => {
+        push(`data: {"type":"tool-call","toolCallId":"${tc.toolCallId}","toolName":"${tc.toolName}","args":${JSON.stringify(tc.args || tc.input || {})}}\n\n`);
+        const tr = toolResults.find(r => r.toolCallId === tc.toolCallId);
+        if (tr) {
+          push(`data: {"type":"tool-result","toolCallId":"${tc.toolCallId}","toolName":"${tc.toolName}","result":${JSON.stringify(tr.result || tr.output || {})}}\n\n`);
+        }
+      });
+
+      if (result.text) {
+        push(`data: {"type":"text-start","id":"msg_${Date.now()}"}\n\n`);
+        push(`data: {"type":"text-delta","textDelta":${JSON.stringify(result.text)}}\n\n`);
+        push(`data: {"type":"text-end"}\n\n`);
+      }
+
+      push(`data: {"type":"finish-step"}\n\n`);
+      push(`data: {"type":"finish","finishReason":"stop"}\n\n`);
+      push(`data: [DONE]\n\n`);
+      
+      controller.close();
+    }
+  });
+
+  return new Response(stream, {
+    headers: { 'Content-Type': 'text/event-stream; charset=utf-8' }
+  });
 }

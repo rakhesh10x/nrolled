@@ -1,6 +1,6 @@
 "use client";
 
-import { Send, Sparkles, Bot, User, Briefcase, FileText, Calendar, Search, ArrowRight } from "lucide-react";
+import { Send, Sparkles, Bot, User, Briefcase, FileText, Calendar, Search, ArrowLeft } from "lucide-react";
 import styles from "./page.module.css";
 import { useEffect, useRef, useState } from "react";
 
@@ -126,6 +126,11 @@ export default function Chat() {
     <main className={styles.main}>
       {/* ─── HEADER ─── */}
       <header className={styles.header}>
+        {messages.length > 0 ? (
+          <button className={styles.backButton} onClick={() => setMessages([])}>
+            <ArrowLeft size={18} />
+          </button>
+        ) : null}
         <div className={styles.headerIcon}>
           <Sparkles size={22} color="white" />
         </div>
